@@ -20,19 +20,19 @@ class Submarine:
         # PID and Control Gains
         self.ALIGN_YAW_P_GAIN = 0.6
         self.ALIGN_SWAY_P_GAIN = 1.8
-        self.ALIGN_DAMPING_GAIN = 1.0
+        self.ALIGN_DAMPING_GAIN = 0.5
         self.YAW_D_GAIN = 2.0
-        self.HEAVE_P_GAIN = 0.8
+        self.HEAVE_P_GAIN = 1.5
         self.HEAVE_D_GAIN = 1.5
         self.HOVER_DEPTH_P_GAIN = 1.2
         self.HOVER_DEPTH_D_GAIN = 0.8
         self.HOVER_PITCH_P_GAIN = 0.9
         self.HOVER_PITCH_D_GAIN = 0.7
         self.HOVER_YAW_P_GAIN = 0.3
-        self.HOVER_XY_P_GAIN = 3.0
+        self.HOVER_XY_P_GAIN = 2.0
         self.HOVER_XY_I_GAIN = 1.2
         self.HOVER_XY_D_GAIN = 1.8
-        self.DAMPING_GAIN = 1.5
+        self.DAMPING_GAIN = 1.0
         self.MANEUVER_DAMPING_GAIN = 3.0
         self.SURGE_MIN_SPEED = 0.3
         self.SURGE_MAX_SPEED = 0.8
@@ -94,6 +94,7 @@ class Submarine:
             
             if isinstance(next_task, HoverTask):
                 self.target_x, self.target_y = sensors.x, sensors.y
+                self.integral_x_err, self.integral_y_err = 0.0, 0.0
         
         return commands, vision_data
 
