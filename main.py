@@ -5,8 +5,8 @@ Assembles and starts the simulation.
 """
 from simulator import SubmarineSimulator
 from ai.submarine import Submarine
-from ai.tasks import (GateTask, SlalomTask, StabilizeTask, 
-                      TimedHoverTask, SurfaceTask)
+from ai.tasks import (GateTask, SlalomTask, StabilizeTask,
+                      TimedHoverTask, SurfaceTask, VictoryDanceTask)
 
 if __name__ == "__main__":
     # Define mission-specific parameters in one place
@@ -17,6 +17,7 @@ if __name__ == "__main__":
         # --- Outbound Journey ---
         GateTask(target_depth=MISSION_DEPTH),
         StabilizeTask(duration=3.0),
+        VictoryDanceTask(target_depth=MISSION_DEPTH),
         SlalomTask(target_depth=MISSION_DEPTH),
 
         # --- Return Journey ---

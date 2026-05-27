@@ -18,12 +18,17 @@ class VictoryDanceTask(Task):
         # Task-specific parameters
         self.DANCE_PITCH_ANGLE = 90.0
         self.DANCE_COMPLETION_TOLERANCE = 5.0
-        self.DANCE_YAW_P_GAIN = 0.10
+        self.DANCE_YAW_P_GAIN = 0.20
         self.DANCE_PITCH_P_GAIN = 0.25
         self.reset()
 
     def reset(self):
         self.dance_step = 0
+
+    def on_start(self, sub: 'Submarine', sensors: SensorSuite):
+        sub.dance_center_heading = sensors.heading
+        sub.target_heading = sensors.heading
+        sub.target_pitch = 0.0
 
     @property
     def state_name(self) -> str:
@@ -38,7 +43,8 @@ class VictoryDanceTask(Task):
             4: "SET_TURN_RIGHT", 5: "WAIT_TURN_RIGHT", 6: "SET_TURN_CENTER", 7: "WAIT_TURN_CENTER",
             8: "SET_PITCH_DOWN", 9: "WAIT_PITCH_DOWN", 10: "SET_PITCH_CENTER", 11: "WAIT_PITCH_CENTER",
             12: "SET_PITCH_UP", 13: "WAIT_PITCH_UP", 14: "SET_PITCH_CENTER", 15: "WAIT_PITCH_CENTER",
-            16: "FINISH"
+            16: "SET_TURN_CENTER", 17: "WAIT_TURN_CENTER",
+            18: "FINISH"
         }
         move = moves.get(self.dance_step, "FINISH")
 
