@@ -173,7 +173,7 @@ class SlalomTask(Task):
                     if self.time_since_poles_lost > 2.0:
                         self.current_state = SlalomTaskState.SEARCHING
                         self.time_since_poles_lost = 0.0
-                    return TaskStatus.RUNNING, self._get_pd_heading_commands(sub, sensors, self.course_axis_heading)
+                    return TaskStatus.RUNNING, sub._get_damping_commands(sensors, self.target_depth)
 
                 self.time_since_poles_lost = 0.0
                 vision_data.selected_slalom_poles = list(gatelet)
@@ -186,13 +186,14 @@ class SlalomTask(Task):
                     self.current_state = SlalomTaskState.APPROACH
                     return TaskStatus.RUNNING, sub._get_damping_commands(sensors, self.target_depth)
 
-                sway_p = (pixel_error / (cam_w / 2)) * self.ALIGN_SWAY_P_GAIN
+                sway_p = -(pixel_error / (cam_w / 2)) * self.ALIGN_SWAY_P_GAIN
                 h_rad = math.radians(sensors.heading)
                 sideways_velocity = -sensors.velocity_x * math.sin(h_rad) + sensors.velocity_y * math.cos(h_rad)
                 sway_d = -sideways_velocity * sub.SLALOM_SWAY_D_GAIN
                 sway = np.clip(sway_p + sway_d, -1.0, 1.0)
-                
-                surge = -sensors.velocity_x * sub.ALIGN_DAMPING_GAIN
+
+                cos_h, sin_h = math.cos(h_rad), math.sin(h_rad)
+                surge = -(sensors.velocity_x * cos_h + sensors.velocity_y * sin_h) * sub.ALIGN_DAMPING_GAIN
                 yaw_p = angle_diff(self.course_axis_heading, sensors.heading) * sub.ALIGN_YAW_P_GAIN
                 yaw_d = -sensors.imu.gyro_z * sub.YAW_D_GAIN
                 yaw = np.clip(yaw_p + yaw_d, -1.0, 1.0)
