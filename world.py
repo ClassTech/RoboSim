@@ -49,8 +49,10 @@ class SubmarinePhysicsState:
     z: float = 0.0
     heading: float = 0.0
     pitch: float = 0.0
+    roll: float = 0.0
     velocity_x: float = 0.0
     velocity_y: float = 0.0
     velocity_z: float = 0.0
     angular_velocity_z: float = 0.0
     angular_velocity_y: float = 0.0
+    angular_velocity_x: float = 0.0

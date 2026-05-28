@@ -33,6 +33,8 @@ class Submarine:
         self.HOVER_XY_I_GAIN = 1.2
         self.HOVER_XY_D_GAIN = 1.8
         self.DAMPING_GAIN = 1.0
+        self.ROLL_RECOVERY_P_GAIN = 0.03   # per degree — drives angle back to 0
+        self.ROLL_RECOVERY_D_GAIN = 2.5    # per rad/s — damps oscillation
         self.MANEUVER_DAMPING_GAIN = 3.0
         self.SURGE_MIN_SPEED = 0.3
         self.SURGE_MAX_SPEED = 0.8
@@ -59,7 +61,7 @@ class Submarine:
         self.last_error_x = 0.0
         self.dance_center_heading = 0.0
         self.gate_passage_side = 'left'
-        self.target_x, self.target_y, self.target_heading, self.target_pitch = 0.0, 0.0, 0.0, 0.0
+        self.target_x, self.target_y, self.target_heading, self.target_pitch, self.target_roll = 0.0, 0.0, 0.0, 0.0, 0.0
         self.integral_x_err, self.integral_y_err, self.integral_clamp, self.approach_heading = 0.0, 0.0, 2.0, 0.0
         self.pass_start_pos, self.pass_end_pos = None, None
         self.course_heading = 0.0
@@ -137,9 +139,11 @@ class Submarine:
         pitch = (0 - sensors.pitch) * self.HOVER_PITCH_P_GAIN - sensors.angular_velocity_y * self.HOVER_PITCH_D_GAIN
         return self._mix_and_normalize_commands(surge_power, 0, heave, yaw, pitch)
 
-    def _get_pid_hover_commands(self, sensors: SensorSuite, dt: float, tx: float, ty: float, td: float, 
-                                yaw_p_gain_override: Optional[float] = None, 
-                                pitch_p_gain_override: Optional[float] = None) -> ThrusterCommands:
+    def _get_pid_hover_commands(self, sensors: SensorSuite, dt: float, tx: float, ty: float, td: float,
+                                yaw_p_gain_override: Optional[float] = None,
+                                pitch_p_gain_override: Optional[float] = None,
+                                roll: float = 0.0,
+                                heave_scale: float = 1.0) -> ThrusterCommands:
         
         yaw_p_gain = yaw_p_gain_override if yaw_p_gain_override is not None else self.HOVER_YAW_P_GAIN
         pitch_p_gain = pitch_p_gain_override if pitch_p_gain_override is not None else self.HOVER_PITCH_P_GAIN
@@ -155,14 +159,14 @@ class Submarine:
         fsh, sway = wtx * c + wty * s, -wtx * s + wty * c
         
         pitch_cmd = (self.target_pitch - sensors.pitch) * pitch_p_gain - sensors.angular_velocity_y * self.HOVER_PITCH_D_GAIN
-        yaw_cmd = angle_diff(self.target_heading, sensors.heading) * yaw_p_gain
-        fwv = ((td - sensors.depth) * self.HOVER_DEPTH_P_GAIN) - (sensors.velocity_z * self.HOVER_DEPTH_D_GAIN)
+        yaw_cmd = np.clip(angle_diff(self.target_heading, sensors.heading) * yaw_p_gain, -1.0, 1.0)
+        fwv = (((td - sensors.depth) * self.HOVER_DEPTH_P_GAIN) - (sensors.velocity_z * self.HOVER_DEPTH_D_GAIN)) * heave_scale
 
         p_rad = math.radians(sensors.pitch)
         cp, sp = math.cos(p_rad), math.sin(p_rad)
         surge, heave = fsh * cp - fwv * sp, fsh * sp + fwv * cp
         
-        return self._mix_and_normalize_commands(surge, sway, heave, yaw_cmd, pitch_cmd)
+        return self._mix_and_normalize_commands(surge, sway, heave, yaw_cmd, pitch_cmd, roll=roll)
 
     def _get_damping_commands(self, sensors: SensorSuite, target_depth) -> ThrusterCommands:
         wdx, wdy = -sensors.velocity_x * self.DAMPING_GAIN, -sensors.velocity_y * self.DAMPING_GAIN
@@ -175,17 +179,18 @@ class Submarine:
         yaw = angle_diff(self.target_heading, sensors.heading) * self.HOVER_YAW_P_GAIN
         fwv = ((target_depth - sensors.depth) * self.HOVER_DEPTH_P_GAIN) - (sensors.velocity_z * self.HOVER_DEPTH_D_GAIN)
         surge, heave = fsh*cp-fwv*sp, fsh*sp+fwv*cp
-        return self._mix_and_normalize_commands(surge, sway, heave, yaw, pitch)
+        roll = np.clip(-sensors.roll * self.ROLL_RECOVERY_P_GAIN - sensors.angular_velocity_x * self.ROLL_RECOVERY_D_GAIN, -1.0, 1.0)
+        return self._mix_and_normalize_commands(surge, sway, heave, yaw, pitch, roll=roll)
         
-    def _mix_and_normalize_commands(self, surge, sway, heave, yaw, pitch) -> ThrusterCommands:
+    def _mix_and_normalize_commands(self, surge, sway, heave, yaw, pitch, roll=0.0) -> ThrusterCommands:
         commands = ThrusterCommands()
-        commands.v_bow, commands.v_aft = heave+pitch, heave-pitch
+        commands.v_port, commands.v_starboard = heave + roll, heave - roll
         commands.h_port_bow, commands.h_starboard_bow = surge+sway+yaw, surge-sway-yaw
         commands.h_port_aft, commands.h_starboard_aft = surge-sway+yaw, surge+sway-yaw
-        max_abs = max(1.0, abs(commands.v_bow), abs(commands.v_aft), abs(commands.h_port_bow), 
+        max_abs = max(1.0, abs(commands.v_port), abs(commands.v_starboard), abs(commands.h_port_bow),
                       abs(commands.h_starboard_bow), abs(commands.h_port_aft), abs(commands.h_starboard_aft))
         if max_abs > 1.0:
-            commands.v_bow/=max_abs; commands.v_aft/=max_abs; commands.h_port_bow/=max_abs
+            commands.v_port/=max_abs; commands.v_starboard/=max_abs; commands.h_port_bow/=max_abs
             commands.h_starboard_bow/=max_abs; commands.h_port_aft/=max_abs; commands.h_starboard_aft/=max_abs
         return commands
     def get_go_to_visual_target_commands(self, sensors: SensorSuite, nav_target_x: float, vertical_target_y: float, surge_power: float):

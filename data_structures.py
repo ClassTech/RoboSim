@@ -25,7 +25,9 @@ class SensorSuite:
     velocity_x: float = 0.0
     velocity_y: float = 0.0
     angular_velocity_y: float = 0.0
+    angular_velocity_x: float = 0.0
     velocity_z: float = 0.0
+    roll: float = 0.0
 
 @dataclass
 class VisionData:
@@ -51,6 +53,6 @@ class ThrusterCommands:
     h_starboard_bow: float = 0.0
     h_port_aft: float = 0.0
     h_starboard_aft: float = 0.0
-    v_bow: float = 0.0
-    v_aft: float = 0.0
+    v_port: float = 0.0
+    v_starboard: float = 0.0
     pause_simulation: bool = False

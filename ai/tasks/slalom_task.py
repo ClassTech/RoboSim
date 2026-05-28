@@ -130,7 +130,8 @@ class SlalomTask(Task):
         heave = (self.target_depth - sensors.depth) * sub.HOVER_DEPTH_P_GAIN - sensors.velocity_z * sub.HOVER_DEPTH_D_GAIN
         pitch = (0 - sensors.pitch) * sub.HOVER_PITCH_P_GAIN - sensors.angular_velocity_y * sub.HOVER_PITCH_D_GAIN
         
-        return sub._mix_and_normalize_commands(surge_power, 0, heave, yaw, pitch)
+        roll = np.clip(-sensors.roll * sub.ROLL_RECOVERY_P_GAIN - sensors.angular_velocity_x * sub.ROLL_RECOVERY_D_GAIN, -1.0, 1.0)
+        return sub._mix_and_normalize_commands(surge_power, 0, heave, yaw, pitch, roll=roll)
 
     def execute(self, sub: 'Submarine', dt: float, sensors: SensorSuite, vision_data: VisionData, config: SimulationConfig) -> Tuple[TaskStatus, ThrusterCommands]:
         if not self.task_is_initialized:
@@ -200,7 +201,8 @@ class SlalomTask(Task):
                 heave = (self.target_depth - sensors.depth) * sub.HOVER_DEPTH_P_GAIN - sensors.velocity_z * sub.HOVER_DEPTH_D_GAIN
                 pitch = (0 - sensors.pitch) * sub.HOVER_PITCH_P_GAIN - sensors.angular_velocity_y * sub.HOVER_PITCH_D_GAIN
 
-                return TaskStatus.RUNNING, sub._mix_and_normalize_commands(surge, sway, heave, yaw, pitch)
+                roll = np.clip(-sensors.roll * sub.ROLL_RECOVERY_P_GAIN - sensors.angular_velocity_x * sub.ROLL_RECOVERY_D_GAIN, -1.0, 1.0)
+                return TaskStatus.RUNNING, sub._mix_and_normalize_commands(surge, sway, heave, yaw, pitch, roll=roll)
 
         elif self.current_state == SlalomTaskState.APPROACH:
             gatelet = self._get_target_gatelet(sub, vision_data.visible_poles)
@@ -237,8 +239,8 @@ class SlalomTask(Task):
             yaw = np.clip(yaw_p + yaw_d, -1.0, 1.0)
             heave = -sensors.velocity_z * sub.HOVER_DEPTH_D_GAIN
             pitch = (0 - sensors.pitch) * sub.HOVER_PITCH_P_GAIN - sensors.angular_velocity_y * sub.HOVER_PITCH_D_GAIN
-            
-            return TaskStatus.RUNNING, sub._mix_and_normalize_commands(surge_power, 0, heave, yaw, pitch)
+            roll = np.clip(-sensors.roll * sub.ROLL_RECOVERY_P_GAIN - sensors.angular_velocity_x * sub.ROLL_RECOVERY_D_GAIN, -1.0, 1.0)
+            return TaskStatus.RUNNING, sub._mix_and_normalize_commands(surge_power, 0, heave, yaw, pitch, roll=roll)
 
         elif self.current_state == SlalomTaskState.REALIGNING:
             if abs(angle_diff(self.course_axis_heading, sensors.heading)) < 5.0:

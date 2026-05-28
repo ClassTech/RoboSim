@@ -98,29 +98,34 @@ class SubmarineSimulator:
                 elif event.key == pygame.K_s: self.skip_to_slalom()
 
     def applyPhysics(self, dt, commands):
-        f = [c*self.thrusterMaxForce for c in [commands.h_port_bow,commands.h_starboard_bow,commands.h_port_aft,commands.h_starboard_aft, commands.v_bow, commands.v_aft]]
+        f = [c*self.thrusterMaxForce for c in [commands.h_port_bow,commands.h_starboard_bow,commands.h_port_aft,commands.h_starboard_aft, commands.v_port, commands.v_starboard]]
         ca, sa = math.cos(math.radians(45)), math.sin(math.radians(45))
-        
+
         surge, sway, heave = (f[0]+f[1]+f[2]+f[3])*ca, (f[0]-f[1]-f[2]+f[3])*sa, f[4]+f[5]
-        
+
         yaw_t = (f[0]-f[1]+f[2]-f[3])*ca*(self.config.submarineWidth/2)
-        pitch_t = (f[4]-f[5])*(self.config.submarineLength/2)
+        roll_t = (f[4]-f[5])*(self.config.submarineWidth/2)
+        r = math.radians(self.subPhysics.roll)
+        cr, sr = math.cos(r), math.sin(r)
+        heave_r = sway*sr + heave*cr
+        sway_r  = sway*cr - heave*sr
         h,p = math.radians(self.subPhysics.heading), math.radians(self.subPhysics.pitch)
         ch,sh,cp,sp = math.cos(h),math.sin(h),math.cos(p),math.sin(p)
-        fsh, fwv = surge*cp+heave*sp, heave*cp-surge*sp
-        fx,fy,fz = fsh*ch-sway*sh, fsh*sh+sway*ch, fwv+self.netBuoyancyForce
+        fsh, fwv = surge*cp+heave_r*sp, heave_r*cp-surge*sp
+        fx,fy,fz = fsh*ch-sway_r*sh, fsh*sh+sway_r*ch, fwv+self.netBuoyancyForce
         speed = math.hypot(self.subPhysics.velocity_x, self.subPhysics.velocity_y)
         dm = self.linearDragCoeff*speed*speed
         dx,dy,dz = -dm*(self.subPhysics.velocity_x/speed) if speed>0 else 0, -dm*(self.subPhysics.velocity_y/speed) if speed>0 else 0, -self.linearDragCoeff*2*self.subPhysics.velocity_z*abs(self.subPhysics.velocity_z)
-        d_yaw, d_pitch = -self.angularDragCoeff*self.subPhysics.angular_velocity_z**2*np.sign(self.subPhysics.angular_velocity_z), -self.angularDragCoeff*self.subPhysics.angular_velocity_y**2*np.sign(self.subPhysics.angular_velocity_y)
+        d_yaw = -self.angularDragCoeff*self.subPhysics.angular_velocity_z**2*np.sign(self.subPhysics.angular_velocity_z)
+        d_roll = -self.angularDragCoeff*self.subPhysics.angular_velocity_x**2*np.sign(self.subPhysics.angular_velocity_x)
         ax,ay,az = (fx+dx)/self.subMass, (fy+dy)/self.subMass, (fz+dz)/self.subMass
         self.last_imu_readings = MPU6050Readings(accel_x=-ax*sh+ay*ch, accel_y=ax*ch+ay*sh, accel_z=az, gyro_z=self.subPhysics.angular_velocity_z)
         self.subPhysics.velocity_x+=ax*dt; self.subPhysics.velocity_y+=ay*dt; self.subPhysics.velocity_z+=az*dt
         self.subPhysics.angular_velocity_z+=((yaw_t+d_yaw)/self.subInertia)*dt
-        self.subPhysics.angular_velocity_y+=((pitch_t+d_pitch)/self.subInertia)*dt
+        self.subPhysics.angular_velocity_x+=((roll_t+d_roll)/self.subInertia)*dt
         self.subPhysics.x+=self.subPhysics.velocity_x*dt; self.subPhysics.y+=self.subPhysics.velocity_y*dt; self.subPhysics.z+=self.subPhysics.velocity_z*dt
         self.subPhysics.heading=(self.subPhysics.heading+math.degrees(self.subPhysics.angular_velocity_z*dt))%360
-        self.subPhysics.pitch=np.clip(self.subPhysics.pitch+math.degrees(self.subPhysics.angular_velocity_y*dt), -90, 90)
+        self.subPhysics.roll=np.clip(self.subPhysics.roll+math.degrees(self.subPhysics.angular_velocity_x*dt), -180, 180)
         margin=0.5
         self.subPhysics.x=np.clip(self.subPhysics.x,margin,self.config.worldWidth-margin); self.subPhysics.y=np.clip(self.subPhysics.y,margin,self.config.worldHeight-margin); self.subPhysics.z=np.clip(self.subPhysics.z,0.0,self.config.worldDepth-margin)
     
@@ -130,6 +135,9 @@ class SubmarineSimulator:
         ch,sh,cp,sp = math.cos(h),math.sin(h),math.cos(p),math.sin(p)
         x_yaw, y_yaw = dx*ch-dy*sh, dx*sh+dy*ch
         cz,cy,cx = x_yaw*cp+dz*sp, x_yaw*sp-dz*cp, y_yaw
+        r = math.radians(self.subPhysics.roll)
+        cr,sr = math.cos(r),math.sin(r)
+        cx,cy = cx*cr-cy*sr, cx*sr+cy*cr
         if cz < 0.2: return None
         w,h = self.cameraSurface.get_size()
         f = w/(2*math.tan(math.radians(self.config.cameraFov/2)))
@@ -243,8 +251,8 @@ class SubmarineSimulator:
         speed = math.hypot(self.subPhysics.velocity_x, self.subPhysics.velocity_y)
         task,state = self.submarineAI.get_current_task_name(), self.submarineAI.get_current_state_name()
         stats=[f"Time: {time.time()-self.startTime:.1f}s", f"Task: {task}", f"State: {state}",
-               f"Speed: {speed:.2f} m/s", f"Heading: {self.subPhysics.heading:.1f}°", 
-               f"Pitch: {self.subPhysics.pitch:.1f}°", f"Depth: {self.subPhysics.z:.2f} m"]
+               f"Speed: {speed:.2f} m/s", f"Heading: {self.subPhysics.heading:.1f}°",
+               f"Pitch: {self.subPhysics.pitch:.1f}°", f"Roll: {self.subPhysics.roll:.1f}°", f"Depth: {self.subPhysics.z:.2f} m"]
         for s in stats: self.screen.blit(self.smallFont.render(s,True,BLACK),(20,y)); y+=20
         y+=10
         imu = self.last_imu_readings
@@ -260,7 +268,7 @@ class SubmarineSimulator:
         h_labels=[("H-PB",tc.h_port_bow),("H-SB",tc.h_starboard_bow),("H-PA",tc.h_port_aft),("H-SA",tc.h_starboard_aft)]
         for i,(l,v) in enumerate(h_labels): self._drawThrusterBar(tx+i*50,ty,l,v)
         ty+=110
-        v_labels=[("V-Bow",tc.v_bow),("V-Aft",tc.v_aft)]
+        v_labels=[("V-Port",tc.v_port),("V-Stbd",tc.v_starboard)]
         for i,(l,v) in enumerate(v_labels): self._drawThrusterBar(tx+i*50,ty,l,v)
 
     def run(self):
@@ -274,11 +282,14 @@ class SubmarineSimulator:
                 continue
             
             self.generateCameraView()
-            sensors = SensorSuite(camera_image=self.cameraSurface, depth=self.subPhysics.z, 
-                                  heading=self.subPhysics.heading, pitch=self.subPhysics.pitch, 
-                                  imu=self.last_imu_readings, x=self.subPhysics.x, y=self.subPhysics.y,
+            sensors = SensorSuite(camera_image=self.cameraSurface, depth=self.subPhysics.z,
+                                  heading=self.subPhysics.heading, pitch=self.subPhysics.pitch,
+                                  roll=self.subPhysics.roll, imu=self.last_imu_readings,
+                                  x=self.subPhysics.x, y=self.subPhysics.y,
                                   velocity_x=self.subPhysics.velocity_x, velocity_y=self.subPhysics.velocity_y,
-                                  angular_velocity_y=self.subPhysics.angular_velocity_y, velocity_z=self.subPhysics.velocity_z)
+                                  angular_velocity_y=self.subPhysics.angular_velocity_y,
+                                  angular_velocity_x=self.subPhysics.angular_velocity_x,
+                                  velocity_z=self.subPhysics.velocity_z)
             
             thrusterCommands, vision_data = self.submarineAI.update(dt, sensors)
             
