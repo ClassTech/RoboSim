@@ -125,7 +125,7 @@ class SubmarineSimulator:
         self.subPhysics.angular_velocity_x+=((roll_t+d_roll)/self.subInertia)*dt
         self.subPhysics.x+=self.subPhysics.velocity_x*dt; self.subPhysics.y+=self.subPhysics.velocity_y*dt; self.subPhysics.z+=self.subPhysics.velocity_z*dt
         self.subPhysics.heading=(self.subPhysics.heading+math.degrees(self.subPhysics.angular_velocity_z*dt))%360
-        self.subPhysics.roll=np.clip(self.subPhysics.roll+math.degrees(self.subPhysics.angular_velocity_x*dt), -180, 180)
+        self.subPhysics.roll = ((self.subPhysics.roll + math.degrees(self.subPhysics.angular_velocity_x * dt) + 180) % 360) - 180
         margin=0.5
         self.subPhysics.x=np.clip(self.subPhysics.x,margin,self.config.worldWidth-margin); self.subPhysics.y=np.clip(self.subPhysics.y,margin,self.config.worldHeight-margin); self.subPhysics.z=np.clip(self.subPhysics.z,0.0,self.config.worldDepth-margin)
     
@@ -135,9 +135,6 @@ class SubmarineSimulator:
         ch,sh,cp,sp = math.cos(h),math.sin(h),math.cos(p),math.sin(p)
         x_yaw, y_yaw = dx*ch-dy*sh, dx*sh+dy*ch
         cz,cy,cx = x_yaw*cp+dz*sp, x_yaw*sp-dz*cp, y_yaw
-        r = math.radians(self.subPhysics.roll)
-        cr,sr = math.cos(r),math.sin(r)
-        cx,cy = cx*cr-cy*sr, cx*sr+cy*cr
         if cz < 0.2: return None
         w,h = self.cameraSurface.get_size()
         f = w/(2*math.tan(math.radians(self.config.cameraFov/2)))
@@ -226,7 +223,20 @@ class SubmarineSimulator:
         pygame.draw.polygon(self.screen, YELLOW, rotated_arrow)
         
         self._renderUi()
-        scaled_camera = pygame.transform.scale(self.cameraSurface, (400, 300))
+        cam_w, cam_h = self.cameraSurface.get_size()
+        roll = self.subPhysics.roll
+        if abs(roll) > 0.5:
+            pad = 400
+            padded = pygame.Surface((pad, pad))
+            padded.fill((0, 0, 0))
+            padded.blit(self.cameraSurface, ((pad - cam_w) // 2, (pad - cam_h) // 2))
+            rotated = pygame.transform.rotate(padded, -roll)
+            rw, rh = rotated.get_size()
+            src_rect = pygame.Rect((rw - cam_w) // 2, (rh - cam_h) // 2, cam_w, cam_h)
+            display_cam = rotated.subsurface(src_rect).copy()
+        else:
+            display_cam = self.cameraSurface
+        scaled_camera = pygame.transform.scale(display_cam, (400, 300))
         self.screen.blit(scaled_camera, (self.width-420, 20))
         pygame.draw.rect(self.screen, BLACK, (self.width-420, 20, 400, 300), 2)
         pygame.display.flip()

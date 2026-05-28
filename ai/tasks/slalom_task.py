@@ -32,7 +32,7 @@ class SlalomTask(Task):
         
         self.CLEAR_DURATION = 1.5
         self.SEARCH_SWEEP_ANGLE = 80.0
-        self.ALIGN_SWAY_P_GAIN = 0.5
+        self.ALIGN_SWAY_P_GAIN = 1.0
         
         self.reset()
 

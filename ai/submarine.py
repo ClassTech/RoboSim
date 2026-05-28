@@ -41,7 +41,7 @@ class Submarine:
         self.SEARCH_TURN_COMMAND = 0.25
         self.SCAN_TURN_COMMAND = 0.2
         self.SLALOM_NAV_YAW_GAIN = 1.5
-        self.SLALOM_SWAY_D_GAIN = 2.0 
+        self.SLALOM_SWAY_D_GAIN = 3.0
         self.ALIGN_POLE_HEIGHT_P_GAIN = 0.02
         self.ALIGN_HEADING_TOLERANCE = 3.0
         self.ALIGN_POS_TOLERANCE = 0.08

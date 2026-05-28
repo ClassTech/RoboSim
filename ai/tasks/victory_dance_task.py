@@ -13,21 +13,20 @@ from utils import angle_diff
 
 class VictoryDanceTask(Task):
     def __init__(self, target_depth: float):
-        # Accept and store the target depth for this specific task instance
         self.target_depth = target_depth
-        
-        # Task-specific parameters
-        self.DANCE_ROLL_ANGLE = 45.0
-        self.DANCE_COMPLETION_TOLERANCE = 5.0
-        self.DANCE_YAW_P_GAIN = 0.20
-        self.DANCE_ROLL_P_GAIN = 0.008   # per degree — keeps command proportional
-        self.DANCE_ROLL_D_GAIN = 0.15
-        self.DANCE_ROLL_MAX = 0.35       # cap so heave always dominates
-        self.DANCE_ROLL_RATE_SETTLE = 0.15  # rad/s — roll rate must be below this to advance
+
+        self.DANCE_YAW_SPIN_COMMAND = 0.5
+        self.DANCE_ROLL_SPIN_COMMAND = 0.6
+        self.DANCE_SETTLE_ANGLE = 5.0    # degrees
+        self.DANCE_RATE_SETTLE = 0.15    # rad/s
         self.reset()
 
     def reset(self):
         self.dance_step = 0
+        self.yaw_accumulated = 0.0
+        self.roll_accumulated = 0.0
+        self.last_heading = None
+        self.last_roll = None
 
     def on_start(self, sub: 'Submarine', sensors: SensorSuite):
         sub.dance_center_heading = sensors.heading
@@ -39,56 +38,65 @@ class VictoryDanceTask(Task):
 
     @property
     def state_name(self) -> str:
-        return f"DANCE_STEP_{self.dance_step}"
+        steps = ["SPIN_YAW", "RECOVER_YAW", "SPIN_ROLL", "RECOVER_ROLL", "FINISH"]
+        return steps[min(self.dance_step, 4)]
 
-    def process_vision(self, sub: 'Submarine', camera_image: 'pygame.Surface') -> VisionData:
+    def process_vision(self, sub: 'Submarine', camera_image) -> VisionData:
         return VisionData()
 
     def execute(self, sub: 'Submarine', dt: float, sensors: SensorSuite, vision_data: VisionData, config: SimulationConfig) -> Tuple[TaskStatus, ThrusterCommands]:
-        moves = {
-            0: "SET_TURN_LEFT", 1: "WAIT_TURN_LEFT", 2: "SET_TURN_CENTER", 3: "WAIT_TURN_CENTER",
-            4: "SET_TURN_RIGHT", 5: "WAIT_TURN_RIGHT", 6: "SET_TURN_CENTER", 7: "WAIT_TURN_CENTER",
-            8: "SET_ROLL_RIGHT", 9: "WAIT_ROLL_RIGHT", 10: "SET_ROLL_CENTER", 11: "WAIT_ROLL_CENTER",
-            12: "SET_ROLL_LEFT", 13: "WAIT_ROLL_LEFT", 14: "SET_ROLL_CENTER", 15: "WAIT_ROLL_CENTER",
-            16: "SET_TURN_CENTER", 17: "WAIT_TURN_CENTER",
-            18: "FINISH"
-        }
-        move = moves.get(self.dance_step, "FINISH")
 
-        roll_err = sub.target_roll - sensors.roll
-        roll_cmd = np.clip(
-            roll_err * self.DANCE_ROLL_P_GAIN - sensors.angular_velocity_x * self.DANCE_ROLL_D_GAIN,
-            -self.DANCE_ROLL_MAX, self.DANCE_ROLL_MAX
-        )
-
-        # Scale heave target depth error by 1/cos(roll) so depth authority is
-        # maintained as the vertical thrusters tilt with the sub.
-        cos_roll = max(0.35, math.cos(math.radians(sensors.roll)))
-        heave_scale = 1.0 / cos_roll
-
-        commands = sub._get_pid_hover_commands(
-            sensors, dt, sub.target_x, sub.target_y, self.target_depth,
-            yaw_p_gain_override=self.DANCE_YAW_P_GAIN,
-            roll=roll_cmd,
-            heave_scale=heave_scale
-        )
-
-        if "SET_" in move:
-            if move == "SET_TURN_LEFT": sub.target_heading = (sub.dance_center_heading - 90) % 360
-            elif move == "SET_TURN_RIGHT": sub.target_heading = (sub.dance_center_heading + 90) % 360
-            elif move == "SET_TURN_CENTER": sub.target_heading = sub.dance_center_heading
-            elif move == "SET_ROLL_RIGHT": sub.target_roll = self.DANCE_ROLL_ANGLE
-            elif move == "SET_ROLL_LEFT": sub.target_roll = -self.DANCE_ROLL_ANGLE
-            elif move == "SET_ROLL_CENTER": sub.target_roll = 0.0
-            self.dance_step += 1
-        elif "WAIT_" in move:
-            h_err = abs(angle_diff(sensors.heading, sub.target_heading))
-            r_err = abs(sensors.roll - sub.target_roll)
-            roll_settled = abs(sensors.angular_velocity_x) < self.DANCE_ROLL_RATE_SETTLE
-            if ("TURN" in move and h_err < self.DANCE_COMPLETION_TOLERANCE) or \
-               ("ROLL" in move and r_err < self.DANCE_COMPLETION_TOLERANCE and roll_settled):
+        if self.dance_step == 0:  # SPIN_YAW
+            if self.last_heading is None:
+                self.last_heading = sensors.heading
+            delta = angle_diff(sensors.heading, self.last_heading)
+            self.yaw_accumulated += delta
+            self.last_heading = sensors.heading
+            if abs(self.yaw_accumulated) >= 355:
                 self.dance_step += 1
-        elif move == "FINISH":
-            return TaskStatus.COMPLETED, commands
-            
-        return TaskStatus.RUNNING, commands
+
+            heave = (self.target_depth - sensors.depth) * sub.HOVER_DEPTH_P_GAIN - sensors.velocity_z * sub.HOVER_DEPTH_D_GAIN
+            pitch = (0 - sensors.pitch) * sub.HOVER_PITCH_P_GAIN - sensors.angular_velocity_y * sub.HOVER_PITCH_D_GAIN
+            return TaskStatus.RUNNING, sub._mix_and_normalize_commands(0, 0, heave, self.DANCE_YAW_SPIN_COMMAND, pitch)
+
+        elif self.dance_step == 1:  # RECOVER_YAW
+            sub.target_heading = sub.dance_center_heading
+            h_err = abs(angle_diff(sensors.heading, sub.dance_center_heading))
+            if h_err < self.DANCE_SETTLE_ANGLE and abs(sensors.imu.gyro_z) < self.DANCE_RATE_SETTLE:
+                self.dance_step += 1
+            return TaskStatus.RUNNING, sub._get_pid_hover_commands(
+                sensors, dt, sub.target_x, sub.target_y, self.target_depth,
+                yaw_p_gain_override=0.5)
+
+        elif self.dance_step == 2:  # SPIN_ROLL
+            if self.last_roll is None:
+                self.last_roll = sensors.roll
+            delta = sensors.roll - self.last_roll
+            if delta > 180: delta -= 360
+            if delta < -180: delta += 360
+            self.roll_accumulated += delta
+            self.last_roll = sensors.roll
+            if abs(self.roll_accumulated) >= 355:
+                self.dance_step += 1
+
+            # Invert heave command when upside-down so vertical thrusters still push up in world frame
+            cos_roll = math.cos(math.radians(sensors.roll))
+            sign = 1.0 if cos_roll >= 0 else -1.0
+            heave_scale = sign / max(0.3, abs(cos_roll))
+            heave = ((self.target_depth - sensors.depth) * sub.HOVER_DEPTH_P_GAIN - sensors.velocity_z * sub.HOVER_DEPTH_D_GAIN) * heave_scale
+            yaw = np.clip(angle_diff(sub.dance_center_heading, sensors.heading) * sub.HOVER_YAW_P_GAIN, -1.0, 1.0)
+            pitch = (0 - sensors.pitch) * sub.HOVER_PITCH_P_GAIN - sensors.angular_velocity_y * sub.HOVER_PITCH_D_GAIN
+            return TaskStatus.RUNNING, sub._mix_and_normalize_commands(0, 0, heave, yaw, pitch, roll=self.DANCE_ROLL_SPIN_COMMAND)
+
+        elif self.dance_step == 3:  # RECOVER_ROLL
+            if abs(sensors.roll) < self.DANCE_SETTLE_ANGLE and abs(sensors.angular_velocity_x) < self.DANCE_RATE_SETTLE:
+                self.dance_step += 1
+            cos_roll = math.cos(math.radians(sensors.roll))
+            sign = 1.0 if cos_roll >= 0 else -1.0
+            heave_scale = sign / max(0.3, abs(cos_roll))
+            roll_cmd = np.clip(-sensors.roll * sub.ROLL_RECOVERY_P_GAIN - sensors.angular_velocity_x * sub.ROLL_RECOVERY_D_GAIN, -1.0, 1.0)
+            return TaskStatus.RUNNING, sub._get_pid_hover_commands(
+                sensors, dt, sub.target_x, sub.target_y, self.target_depth,
+                yaw_p_gain_override=0.5, roll=roll_cmd, heave_scale=heave_scale)
+
+        return TaskStatus.COMPLETED, ThrusterCommands()

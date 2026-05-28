@@ -18,6 +18,7 @@ if __name__ == "__main__":
         GateTask(target_depth=MISSION_DEPTH),
         StabilizeTask(duration=3.0),
         VictoryDanceTask(target_depth=MISSION_DEPTH),
+        StabilizeTask(duration=5.0),
         SlalomTask(target_depth=MISSION_DEPTH),
 
         # --- Return Journey ---

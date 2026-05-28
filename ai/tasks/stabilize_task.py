@@ -3,6 +3,7 @@
 A simple task to bring the submarine to a full stop.
 """
 import math
+import numpy as np
 from typing import Tuple
 
 from .task_base import Task, TaskStatus
@@ -50,4 +51,5 @@ class StabilizeTask(Task):
         if self.state_timer > self.STABILIZE_DURATION and speed < self.SPEED_THRESHOLD:
             return TaskStatus.COMPLETED, sub._get_damping_commands(sensors, self.target_depth)
 
-        return TaskStatus.RUNNING, sub._get_pid_hover_commands(sensors, dt, sub.target_x, sub.target_y, self.target_depth)
+        roll_cmd = np.clip(-sensors.roll * sub.ROLL_RECOVERY_P_GAIN - sensors.angular_velocity_x * sub.ROLL_RECOVERY_D_GAIN, -1.0, 1.0)
+        return TaskStatus.RUNNING, sub._get_pid_hover_commands(sensors, dt, sub.target_x, sub.target_y, self.target_depth, roll=roll_cmd)
