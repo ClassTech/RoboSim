@@ -5,7 +5,6 @@ Contains the specific implementation for the Gate task.
 import math
 from enum import Enum, auto
 from typing import Tuple
-import pygame
 import numpy as np
 
 from .task_base import Task, TaskStatus
@@ -37,12 +36,18 @@ class GateTask(Task):
         self.search_start_heading, self.has_completed_spin = None, False
         self.time_since_gate_lost = 0.0
         self.clearing_depth = None
+        self.forced_passage = None
+        self.chosen_side = None
+
+    def on_start(self, sub: 'Submarine', sensors):
+        if sub.gate_passage_side is not None:
+            self.forced_passage = 'left' if sub.gate_passage_side == 'right' else 'right'
 
     @property
     def state_name(self) -> str:
         return self.current_state.name
 
-    def process_vision(self, sub: 'Submarine', camera_image: pygame.Surface) -> VisionData:
+    def process_vision(self, sub: 'Submarine', camera_image: np.ndarray) -> VisionData:
         vision_data = VisionData()
         red_blobs = find_blobs_hsv(camera_image, RED_HSV_RANGES, sub.MIN_PIXELS_FOR_DETECTION)
         black_blobs = find_blobs_hsv(camera_image, BLACK_HSV_RANGE, sub.MIN_PIXELS_FOR_DETECTION)
@@ -127,7 +132,7 @@ class GateTask(Task):
             
             self.time_since_gate_lost = 0.0
             self.state_timer += dt
-            cam_w, cam_h = sensors.camera_image.get_size()
+            cam_h, cam_w = sensors.camera_image.shape[:2]
             gate_center_x = (vision_data.min_x + vision_data.max_x) / 2
 
             # 1. Yaw control to center the gate
@@ -173,11 +178,20 @@ class GateTask(Task):
                 self.clearing_depth = sensors.depth
                 return TaskStatus.RUNNING, ThrusterCommands()
 
-            nav_target_x, _ = sub._get_navigation_target(vision_data, sensors.camera_image.get_width())
+            if self.forced_passage:
+                nav_target_x = (vision_data.left_passage_center_x if self.forced_passage == 'left'
+                                else vision_data.right_passage_center_x)
+                self.chosen_side = self.forced_passage
+            elif self.chosen_side is None:
+                nav_target_x, self.chosen_side = sub._get_navigation_target(
+                    vision_data, sensors.camera_image.shape[1])
+            else:
+                nav_target_x = (vision_data.left_passage_center_x if self.chosen_side == 'left'
+                                else vision_data.right_passage_center_x)
             if nav_target_x is None:
-                nav_target_x = sensors.camera_image.get_width() / 2
-            
-            vertical_target_y = vision_data.gate_center_y if vision_data.gate_center_y is not None else sensors.camera_image.get_height() / 2
+                nav_target_x = sensors.camera_image.shape[1] / 2
+
+            vertical_target_y = vision_data.gate_center_y if vision_data.gate_center_y is not None else sensors.camera_image.shape[0] / 2
             
             return TaskStatus.RUNNING, sub.get_go_to_visual_target_commands(sensors, nav_target_x, vertical_target_y, sub.SURGE_MAX_SPEED)
 
@@ -186,6 +200,7 @@ class GateTask(Task):
             clear_depth = max(self.clearing_depth or self.target_depth, self.target_depth)
             if self.state_timer <= 0:
                 sub.gateCompleted = True
+                sub.gate_passage_side = self.chosen_side
                 sub.target_x, sub.target_y = sensors.x, sensors.y
                 sub.target_heading = sensors.heading
                 return TaskStatus.COMPLETED, sub._get_damping_commands(sensors, clear_depth)

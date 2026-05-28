@@ -57,6 +57,7 @@ class Submarine:
         for task in self.mission_plan:
             task.reset()
         self.gateCompleted = False
+        self.gate_passage_side = None
         self.dance_center_heading = 0.0
         self.target_x, self.target_y, self.target_heading, self.target_pitch, self.target_roll = 0.0, 0.0, 0.0, 0.0, 0.0
         self.integral_x_err, self.integral_y_err, self.integral_clamp = 0.0, 0.0, 2.0
@@ -191,7 +192,7 @@ class Submarine:
         A robust, generic 'point-and-drive' controller for approaching any visual target.
         Uses yaw to steer and sway to damp.
         """
-        cam_w, cam_h = sensors.camera_image.get_size()
+        cam_h, cam_w = sensors.camera_image.shape[:2]
 
         # 1. Yaw control steers the submarine toward the horizontal target
         pixel_error_x = nav_target_x - (cam_w / 2)

@@ -4,7 +4,7 @@ A task to hover in place for a specified duration.
 """
 import math
 from typing import Tuple
-import pygame
+import numpy as np
 
 from ai.tasks.hover_task import HoverTask
 
@@ -26,7 +26,7 @@ class TimedHoverTask(HoverTask):
     def state_name(self) -> str:
         return f"HOVERING ({self.timer:.1f}s / {self.duration:.1f}s)"
 
-    def process_vision(self, sub: 'Submarine', camera_image: pygame.Surface) -> VisionData:
+    def process_vision(self, sub: 'Submarine', camera_image: np.ndarray) -> VisionData:
         return VisionData()
 
     def execute(self, sub: 'Submarine', dt: float, sensors: SensorSuite, vision_data: VisionData, config: 'SimulationConfig') -> Tuple[TaskStatus, ThrusterCommands]:

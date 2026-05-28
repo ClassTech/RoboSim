@@ -26,7 +26,7 @@ class StabilizeTask(Task):
         speed = getattr(self, '_current_speed', 0)
         return f"STABILIZING (Speed: {speed:.2f} m/s)"
 
-    def process_vision(self, sub: 'Submarine', camera_image: 'pygame.Surface') -> VisionData:
+    def process_vision(self, sub: 'Submarine', camera_image: 'np.ndarray') -> VisionData:
         return VisionData()
 
     def execute(self, sub: 'Submarine', dt: float, sensors: SensorSuite, vision_data: VisionData, config: SimulationConfig) -> Tuple[TaskStatus, ThrusterCommands]:

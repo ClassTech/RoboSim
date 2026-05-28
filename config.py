@@ -6,12 +6,12 @@ from dataclasses import dataclass
 
 # --- Constants and Configuration ---
 # Color constants for drawing
-WHITE, BLACK, BLUE, LIGHT_BLUE = (255, 255, 255), (0, 0, 0), (20, 50, 120), (100, 150, 200)
-RED, GREEN, YELLOW, GRAY = (255, 0, 0), (50, 200, 50), (255, 255, 0), (128, 128, 128)
-ORANGE = (255, 165, 0)
+WHITE, BLACK, BLUE, LIGHT_BLUE = (255, 255, 255), (0, 0, 0), (120, 50, 20), (200, 150, 100)
+RED, GREEN, YELLOW, GRAY = (0, 0, 255), (50, 200, 50), (0, 255, 255), (128, 128, 128)
+ORANGE = (0, 165, 255)
 CONTROL_BOX_GRAY = (80, 80, 80)
-SHARK_BLUE, SAWFISH_GREEN = (70, 100, 150), (100, 140, 100)
-POOL_FLOOR_COLOR, WATER_COLOR = (40, 60, 100), (20, 50, 120)
+SHARK_BLUE, SAWFISH_GREEN = (150, 100, 70), (100, 140, 100)
+POOL_FLOOR_COLOR, WATER_COLOR = (100, 60, 40), (120, 50, 20)
 MAGENTA = (255, 0, 255)
 
 # HSV Color Ranges for vision (H: 0-360, S: 0-100, V: 0-100)

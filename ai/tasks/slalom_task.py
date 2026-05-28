@@ -5,7 +5,6 @@ Contains the specific implementation for the Slalom task using a sequential stra
 import math
 from enum import Enum, auto
 from typing import Tuple, List, Dict, Optional
-import pygame
 import numpy as np
 
 from .task_base import Task, TaskStatus
@@ -62,7 +61,7 @@ class SlalomTask(Task):
             return f"ALIGNING ({self.align_phase})"
         return self.current_state.name
         
-    def process_vision(self, sub: 'Submarine', camera_image: pygame.Surface) -> VisionData:
+    def process_vision(self, sub: 'Submarine', camera_image: np.ndarray) -> VisionData:
         vision_data = VisionData()
         reds = find_blobs_hsv(camera_image, RED_HSV_RANGES, sub.MIN_PIXELS_FOR_DETECTION)
         whites = find_blobs_hsv(camera_image, WHITE_HSV_RANGE, sub.MIN_PIXELS_FOR_DETECTION)
@@ -148,7 +147,7 @@ class SlalomTask(Task):
                 if self.current_pass_side is None:
                     red_pole = next((p for p in visible_poles if p.get('color') == 'red'), None)
                     if red_pole:
-                        cam_w = sensors.camera_image.get_width()
+                        cam_w = sensors.camera_image.shape[1]
                         side = 'left' if red_pole['center_x'] > cam_w / 2 else 'right'
                         self.current_pass_side = side
                         if not self.reversed:
@@ -178,7 +177,7 @@ class SlalomTask(Task):
 
                 self.time_since_poles_lost = 0.0
                 vision_data.selected_slalom_poles = list(gatelet)
-                cam_w, _ = sensors.camera_image.get_size()
+                cam_w = sensors.camera_image.shape[1]
                 gatelet_center_x = (gatelet[0]['center_x'] + gatelet[1]['center_x']) / 2.0
                 pixel_error = gatelet_center_x - cam_w / 2
 
@@ -222,7 +221,7 @@ class SlalomTask(Task):
             if not gatelet:
                 return TaskStatus.RUNNING, self._get_pd_heading_commands(sub, sensors, self.course_axis_heading, sub.SURGE_MAX_SPEED * 0.4)
 
-            cam_w, cam_h = sensors.camera_image.get_size()
+            cam_h, cam_w = sensors.camera_image.shape[:2]
             nav_target_x = (gatelet[0]['center_x'] + gatelet[1]['center_x']) / 2.0
             vertical_target = np.mean([p['center_y'] for p in gatelet])
 

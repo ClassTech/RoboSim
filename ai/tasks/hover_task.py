@@ -3,7 +3,7 @@
 Contains the specific implementation for the Hover task.
 """
 from typing import Tuple
-import pygame
+import numpy as np
 
 from .task_base import Task, TaskStatus
 from data_structures import SensorSuite, VisionData, ThrusterCommands
@@ -22,7 +22,7 @@ class HoverTask(Task):
     def reset(self):
         pass
     
-    def process_vision(self, sub: 'Submarine', camera_image: pygame.Surface) -> VisionData:
+    def process_vision(self, sub: 'Submarine', camera_image: np.ndarray) -> VisionData:
         return VisionData()
     
     def execute(self, sub: 'Submarine', dt: float, sensors: SensorSuite, vision_data: VisionData, config: SimulationConfig) -> Tuple[TaskStatus, ThrusterCommands]:

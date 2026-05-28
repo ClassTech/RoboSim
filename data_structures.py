@@ -4,7 +4,7 @@ Defines simple data classes used for passing information between modules.
 """
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict
-import pygame
+import numpy as np
 
 @dataclass
 class MPU6050Readings:
@@ -15,7 +15,7 @@ class MPU6050Readings:
 
 @dataclass
 class SensorSuite:
-    camera_image: pygame.Surface
+    camera_image: np.ndarray
     depth: float
     heading: float
     pitch: float

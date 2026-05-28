@@ -30,7 +30,7 @@ class SlalomPole:
     y: float
     z: float
     height: float = 0.9
-    color: Tuple[int, int, int] = (255, 255, 255) # WHITE
+    color: Tuple[int, int, int] = (255, 255, 255)  # WHITE (BGR)
 
 @dataclass
 class PathMarker:
@@ -40,7 +40,7 @@ class PathMarker:
     length: float = 1.2
     width: float = 0.15
     heading: float = 0.0
-    color: Tuple[int, int, int] = (255, 165, 0) # ORANGE
+    color: Tuple[int, int, int] = (0, 165, 255)  # ORANGE (BGR)
 
 @dataclass
 class SubmarinePhysicsState:

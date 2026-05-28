@@ -3,7 +3,7 @@
 A simple task to bring the submarine to the surface.
 """
 from typing import Tuple
-import pygame
+import numpy as np
 
 from .task_base import Task, TaskStatus
 from data_structures import SensorSuite, VisionData, ThrusterCommands
@@ -19,7 +19,7 @@ class SurfaceTask(Task):
     def state_name(self) -> str:
         return "SURFACING"
     
-    def process_vision(self, sub: 'Submarine', camera_image: pygame.Surface) -> VisionData:
+    def process_vision(self, sub: 'Submarine', camera_image: np.ndarray) -> VisionData:
         return VisionData()
     
     def execute(self, sub: 'Submarine', dt: float, sensors: SensorSuite, vision_data: VisionData, config: 'SimulationConfig') -> Tuple[TaskStatus, ThrusterCommands]:

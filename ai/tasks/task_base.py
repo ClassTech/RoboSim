@@ -5,7 +5,7 @@ Contains the foundation for all tasks: the Task abstract base class.
 from abc import ABC, abstractmethod
 from enum import Enum, auto
 from typing import Tuple
-import pygame
+import numpy as np
 
 from data_structures import SensorSuite, VisionData, ThrusterCommands
 from config import SimulationConfig
@@ -22,7 +22,7 @@ class Task(ABC):
         pass
     
     @abstractmethod
-    def process_vision(self, sub: 'Submarine', camera_image: pygame.Surface) -> VisionData:
+    def process_vision(self, sub: 'Submarine', camera_image: np.ndarray) -> VisionData:
         """Processes the camera image to extract relevant data for the task."""
         pass
 
