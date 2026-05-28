@@ -23,7 +23,7 @@ class GateTaskState(Enum):
 
 class GateTask(Task):
     def __init__(self, target_depth: float):
-        self.target_depth = 1.5
+        self.target_depth = target_depth
         self.ALIGN_CENTER_TOLERANCE_PX = 10 
         self.ALIGN_SQUARE_TOLERANCE_PX = 10 
         self.ALIGN_YAW_RATE_TOLERANCE_RPS = 0.05 
@@ -155,7 +155,6 @@ class GateTask(Task):
             is_depth_aligned = abs(vertical_target_y - cam_h / 2) < 10
 
             if is_centered and is_stable and (is_depth_aligned or self.state_timer >= 8.0):
-                sub.approach_heading = sensors.heading
                 self.current_state = GateTaskState.APPROACHING
                 self.state_timer = 0.0
                 return TaskStatus.RUNNING, sub._get_damping_commands(sensors, self.target_depth)
@@ -172,11 +171,9 @@ class GateTask(Task):
                 self.current_state = GateTaskState.CLEARING_GATE
                 self.state_timer = self.CLEAR_GATE_DURATION
                 self.clearing_depth = sensors.depth
-                sub.pass_start_pos = (sensors.x, sensors.y)
                 return TaskStatus.RUNNING, ThrusterCommands()
 
-            nav_target_x, side = sub._get_navigation_target(vision_data, sensors.camera_image.get_width())
-            sub.gate_passage_side = side
+            nav_target_x, _ = sub._get_navigation_target(vision_data, sensors.camera_image.get_width())
             if nav_target_x is None:
                 nav_target_x = sensors.camera_image.get_width() / 2
             

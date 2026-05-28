@@ -8,8 +8,5 @@ from .victory_dance_task import VictoryDanceTask
 from .stabilize_task import StabilizeTask
 from .slalom_task import SlalomTask
 from .hover_task import HoverTask
-from .turn_task import TurnTask
 from .timed_hover_task import TimedHoverTask
 from .surface_task import SurfaceTask
-from .drive_straight_task import DriveStraightTask
-from .return_transit_task import ReturnTransitTask 

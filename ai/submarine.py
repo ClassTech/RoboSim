@@ -57,13 +57,9 @@ class Submarine:
         for task in self.mission_plan:
             task.reset()
         self.gateCompleted = False
-        self.lastApparentSize = 0.0
-        self.last_error_x = 0.0
         self.dance_center_heading = 0.0
-        self.gate_passage_side = 'left'
         self.target_x, self.target_y, self.target_heading, self.target_pitch, self.target_roll = 0.0, 0.0, 0.0, 0.0, 0.0
-        self.integral_x_err, self.integral_y_err, self.integral_clamp, self.approach_heading = 0.0, 0.0, 2.0, 0.0
-        self.pass_start_pos, self.pass_end_pos = None, None
+        self.integral_x_err, self.integral_y_err, self.integral_clamp = 0.0, 0.0, 2.0
         self.course_heading = 0.0
         self.slalom_pass_side = None
 
@@ -74,9 +70,6 @@ class Submarine:
         current_task = self.mission_plan[self.current_task_index]
         # CORRECTED: The process_vision method expects the camera_image, not the entire sensor suite.
         vision_data = current_task.process_vision(self, sensors.camera_image)
-        if vision_data.gate_is_visible:
-            self.lastApparentSize = vision_data.apparent_height / sensors.camera_image.get_height()
-        
         status, commands = current_task.execute(self, dt, sensors, vision_data, self.config)
         
         if status == TaskStatus.COMPLETED and self.current_task_index < len(self.mission_plan) - 1:
